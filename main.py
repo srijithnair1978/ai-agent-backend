@@ -10,16 +10,38 @@ from dotenv import load_dotenv
 from io import BytesIO
 from fastapi.responses import FileResponse
 from diffusers import StableDiffusionPipeline
+from fastapi.middleware.cors import CORSMiddleware
 
 # Load environment variables
 load_dotenv()
 
 app = FastAPI()
 
+# Enable CORS (Allow Frontend to Access Backend)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Load API keys securely
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 SERPAPI_KEY = os.getenv("SERPAPI_KEY")
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
+
+
+### **✅ Root Route (Fix for "GET / 404 Not Found")**
+@app.get("/")
+def home():
+    return {"message": "AI Agent Backend is Running!"}
+
+
+### **✅ Fix for "GET /favicon.ico 404 Not Found"**
+@app.get("/favicon.ico")
+async def favicon():
+    return {"message": "No favicon available"}
 
 
 ### **1️⃣ Wikipedia Search**

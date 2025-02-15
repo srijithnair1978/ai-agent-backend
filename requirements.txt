@@ -9,3 +9,5 @@ openai
 python-dotenv
 diffusers
 transformers
+python-multipart
+

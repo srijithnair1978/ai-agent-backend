@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+wikipedia-api
+pandas
+PyMuPDF
+pdfkit
+requests
+openai
+python-dotenv
+diffusers
+transformers

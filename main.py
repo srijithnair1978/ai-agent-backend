@@ -1,123 +1,59 @@
-from fastapi import FastAPI, File, UploadFile
-import wikipediaapi
-import openai
-import os
-import fitz  # PyMuPDF for PDF analysis
-import pandas as pd  # For Excel analysis
-import pdfkit
+from fastapi import FastAPI
 import requests
+import os
 from dotenv import load_dotenv
-from io import BytesIO
-from fastapi.responses import FileResponse
-from diffusers import StableDiffusionPipeline
-from fastapi.middleware.cors import CORSMiddleware
 
-# Load environment variables from .env file
+# Load API keys from environment variables
 load_dotenv()
-
-# Get API keys from .env
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 SERPAPI_KEY = os.getenv("SERPAPI_KEY")
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 
+# Initialize FastAPI app
 app = FastAPI()
 
-# Enable CORS (Allow Frontend to Access Backend)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-### **✅ Root Route (Fix for "GET / 404 Not Found")**
 @app.get("/")
 def home():
     return {"message": "AI Agent Backend is Running!"}
 
+# 📌 DeepSeek API Integration
+@app.get("/deepseek/{query}")
+def deepseek_query(query: str):
+    try:
+        url = "https://api.deepseek.com/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "deepseek-chat",
+            "messages": [{"role": "user", "content": query}]
+        }
+        response = requests.post(url, headers=headers, json=payload)
+        return response.json()
+    except Exception as e:
+        return {"error": str(e)}
 
-### **✅ Fix for "GET /favicon.ico 404 Not Found"**
-@app.get("/favicon.ico")
-async def favicon():
-    return {"message": "No favicon available"}
-
-
-### **1️⃣ Wikipedia Search**
-@app.get("/wikipedia/{query}")
-def search_wikipedia(query: str):
-    wiki = wikipediaapi.Wikipedia('en')
-    page = wiki.page(query)
-    return {"title": page.title, "summary": page.summary}
-
-
-### **2️⃣ Google Search (Using SerpAPI)**
+# 📌 Google Search using SerpAPI
 @app.get("/google/{query}")
 def google_search(query: str):
-    if not SERPAPI_KEY:
-        return {"error": "Missing SERPAPI_KEY in .env"}
-    
-    url = f"https://serpapi.com/search.json?q={query}&api_key={SERPAPI_KEY}"
-    response = requests.get(url)
-    return response.json()
+    try:
+        url = f"https://serpapi.com/search.json?q={query}&api_key={SERPAPI_KEY}"
+        response = requests.get(url)
+        return response.json()
+    except Exception as e:
+        return {"error": str(e)}
 
-
-### **3️⃣ OpenAI Query (Using GPT-3.5)**
-@app.get("/openai/{query}")
-def openai_query(query: str):
-    if not OPENAI_API_KEY:
-        return {"error": "Missing OPENAI_API_KEY in .env"}
-    
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": query}],
-        api_key=OPENAI_API_KEY
-    )
-    return {"response": response.choices[0].message["content"]}
-
-
-### **4️⃣ PDF Upload & Analysis**
-@app.post("/upload-pdf/")
-async def upload_pdf(file: UploadFile = File(...)):
-    text = ""
-    with fitz.open(stream=await file.read(), filetype="pdf") as doc:
-        for page in doc:
-            text += page.get_text()
-    return {"text": text}
-
-
-### **5️⃣ Image Generation (Using Stable Diffusion)**
+# 📌 Image Generation using Hugging Face
 @app.get("/generate-image/{prompt}")
 def generate_image(prompt: str):
-    if not HUGGINGFACE_API_KEY:
-        return {"error": "Missing HUGGINGFACE_API_KEY in .env"}
-    
-    pipe = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
-    image = pipe(prompt).images[0]
-    image_path = "generated_image.png"
-    image.save(image_path)
-    return FileResponse(image_path, media_type="image/png")
-
-
-### **6️⃣ Data Analysis (Excel Upload & Custom Analysis)**
-@app.post("/upload-excel/")
-async def upload_excel(file: UploadFile = File(...)):
-    df = pd.read_excel(BytesIO(await file.read()))
-    return {"columns": list(df.columns), "data": df.to_dict()}
-
-
-### **7️⃣ Flowchart Creation & PDF Export**
-@app.post("/generate-flowchart/")
-async def generate_flowchart(steps: str):
-    flowchart_code = f"""
-    graph TD;
-    {steps.replace(",", " --> ")}
-    """
-    output_path = "flowchart.pdf"
-    pdfkit.from_string(flowchart_code, output_path)
-    return FileResponse(output_path, media_type='application/pdf')
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    try:
+        url = "https://api-inference.huggingface.co/models/CompVis/stable-diffusion-v1-4"
+        headers = {"Authorization": f"Bearer {HUGGINGFACE_API_KEY}"}
+        response = requests.post(url, headers=headers, json={"inputs": prompt})
+        
+        if response.status_code == 200:
+            return response.content
+        return {"error": response.text}
+    except Exception as e:
+        return {"error": str(e)}

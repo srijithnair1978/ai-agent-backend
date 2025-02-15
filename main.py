@@ -12,8 +12,13 @@ from fastapi.responses import FileResponse
 from diffusers import StableDiffusionPipeline
 from fastapi.middleware.cors import CORSMiddleware
 
-# Load environment variables
+# Load environment variables from .env file
 load_dotenv()
+
+# Get API keys from .env
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+SERPAPI_KEY = os.getenv("SERPAPI_KEY")
+HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 
 app = FastAPI()
 
@@ -25,12 +30,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Load API keys securely
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-SERPAPI_KEY = os.getenv("SERPAPI_KEY")
-HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
-
 
 ### **✅ Root Route (Fix for "GET / 404 Not Found")**
 @app.get("/")
@@ -55,14 +54,20 @@ def search_wikipedia(query: str):
 ### **2️⃣ Google Search (Using SerpAPI)**
 @app.get("/google/{query}")
 def google_search(query: str):
+    if not SERPAPI_KEY:
+        return {"error": "Missing SERPAPI_KEY in .env"}
+    
     url = f"https://serpapi.com/search.json?q={query}&api_key={SERPAPI_KEY}"
     response = requests.get(url)
     return response.json()
 
 
-### **3️⃣ OpenAI Query (Using GPT-3.5 or Local GPT4All)**
+### **3️⃣ OpenAI Query (Using GPT-3.5)**
 @app.get("/openai/{query}")
 def openai_query(query: str):
+    if not OPENAI_API_KEY:
+        return {"error": "Missing OPENAI_API_KEY in .env"}
+    
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": query}],
@@ -84,6 +89,9 @@ async def upload_pdf(file: UploadFile = File(...)):
 ### **5️⃣ Image Generation (Using Stable Diffusion)**
 @app.get("/generate-image/{prompt}")
 def generate_image(prompt: str):
+    if not HUGGINGFACE_API_KEY:
+        return {"error": "Missing HUGGINGFACE_API_KEY in .env"}
+    
     pipe = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
     image = pipe(prompt).images[0]
     image_path = "generated_image.png"
